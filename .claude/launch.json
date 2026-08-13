@@ -1,0 +1,9 @@
+{
+  "servers": [
+    {
+      "name": "caddie-book",
+      "command": "npx next dev -p 4765",
+      "port": 4765
+    }
+  ]
+}

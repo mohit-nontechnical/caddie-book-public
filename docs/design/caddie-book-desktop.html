@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Caddie Book</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500;1,600&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    background: #08301F;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    color: #1B2A1D;
+    overflow: hidden;
+  }
+  #root { height: 100vh; }
+
+  .cb-scroll::-webkit-scrollbar { width: 9px; height: 9px; }
+  .cb-scroll::-webkit-scrollbar-thumb { background: rgba(11,61,46,0.18); border-radius: 6px; border: 2px solid transparent; background-clip: content-box; }
+  .cb-scroll::-webkit-scrollbar-thumb:hover { background: rgba(11,61,46,0.3); background-clip: content-box; }
+  .cb-scroll::-webkit-scrollbar-track { background: transparent; }
+  .cb-scroll { scrollbar-width: thin; scrollbar-color: rgba(11,61,46,0.18) transparent; }
+
+  .cb-nav:hover[data-on="0"] { background: rgba(242,236,220,0.06) !important; color: #F2ECDC !important; }
+  .cb-row:hover { background: rgba(199,162,75,0.06) !important; }
+  .cb-hovercard { transition: transform 0.14s cubic-bezier(.2,.8,.3,1), box-shadow 0.14s, border-color 0.14s; }
+  .cb-hovercard:hover { transform: translateY(-2px); box-shadow: 0 12px 28px -16px rgba(11,61,46,0.4) !important; border-color: rgba(199,162,75,0.4) !important; }
+  .cb-chip:hover { border-color: var(--gold) !important; background: rgba(199,162,75,0.08) !important; }
+  .cb-key:hover { background: rgba(242,236,220,0.11) !important; }
+  .cb-send:hover:not(:disabled) { filter: brightness(1.15); }
+  .cb-icon-btn:hover { background: rgba(11,61,46,0.07) !important; }
+  .cb-btn-ghost:hover, .cb-back:hover { filter: brightness(1.06); opacity: 0.9; }
+  .cb-drop:hover { border-color: var(--gold) !important; background: rgba(199,162,75,0.08) !important; }
+
+  @keyframes cbBlink { 0%,80%,100% { opacity: 0.25; } 40% { opacity: 1; } }
+  @keyframes cbShake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(6px); } }
+  @keyframes cbView { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .cb-view { animation: cbView 0.32s cubic-bezier(.2,.8,.3,1) both; }
+  @media (prefers-reduced-motion: reduce) { .cb-view { animation: none; } }
+
+  /* Leaflet theming */
+  .leaflet-container { background: #E4EAE2 !important; font-family: 'DM Sans', sans-serif !important; }
+  .leaflet-tooltip { background: #0B3D2E !important; color: #F2ECDC !important; border: 1px solid rgba(199,162,75,0.4) !important; border-radius: 8px !important; box-shadow: 0 6px 18px -8px rgba(0,0,0,0.5) !important; font-size: 11.5px !important; padding: 6px 9px !important; }
+  .leaflet-tooltip-top:before { border-top-color: #0B3D2E !important; }
+  .leaflet-bar a { color: #0B3D2E !important; }
+  textarea::placeholder { color: rgba(34,49,36,0.4); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+<script src="caddie-data.js"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="caddie-icons.jsx"></script>
+<script type="text/babel" src="caddie-ui.jsx"></script>
+<script type="text/babel" src="caddie-charts.jsx"></script>
+<script type="text/babel" src="caddie-shell.jsx"></script>
+<script type="text/babel" src="caddie-dashboard.jsx"></script>
+<script type="text/babel" src="caddie-pages-rounds.jsx"></script>
+<script type="text/babel" src="caddie-pages-insights.jsx"></script>
+<script type="text/babel" src="caddie-pages-courses.jsx"></script>
+<script type="text/babel" src="caddie-pages-bag.jsx"></script>
+<script type="text/babel" src="caddie-states.jsx"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+const CB = window.CB;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accent": "#C7A24B"
+}/*EDITMODE-END*/;
+
+const ACCENTS = {
+  '#C7A24B': { gold: '#C7A24B', goldInk: '#96742B' }, // gold
+  '#2E8B62': { gold: '#2E8B62', goldInk: '#236F4D' }, // green
+  '#B58A3C': { gold: '#B58A3C', goldInk: '#856428' }, // brass
+};
+
+const ROUTE_TITLE = {
+  dashboard: 'Dashboard', rounds: 'Rounds', insights: 'Insights',
+  courses: 'Courses', bag: 'Bag & Drills', coach: 'Coach', profile: 'Profile',
+};
+
+// canned fallback if the live model is unreachable (keeps demo honest)
+function fallbackCoach(q) {
+  const s = q.toLowerCase();
+  if (s.includes('cost') || s.includes('stroke')) return "Your biggest leak is the 100–150 approach — graded F, 17% greens, 3.4 strokes a round. Fix that one club and you're a mid-90s golfer overnight.";
+  if (s.includes('double') || s.includes('bounce') || s.includes('blow')) return "You recover after a blow-up 46% of the time, up from 38%. The trick is the next tee shot: take driver out of your hands, wedge to the fairway, make a bogey. One bad hole, not two.";
+  if (s.includes('course') || s.includes('stop')) return "Baylands is your hardest at 105.5 — it's long and you can't hide the driver there. If you want confidence rounds, play Rancho del Pueblo, where you average 88.4.";
+  if (s.includes('practice') || s.includes('week')) return "The Window Drill, 15 minutes. Start line from 120 is where your strokes are hiding. Skip the driver on the range — it's not what's costing you.";
+  return "Short version: you're a B putter stuck behind a D driver and an F approach game. Every stroke you want back is inside 150 yards. Ask me about any club and I'll show you the numbers.";
+}
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [authed, setAuthed] = useState(false);
+  const [mode, setMode] = useState('demo'); // demo | empty
+  const [route, setRoute] = useState('dashboard');
+  const [roundDetail, setRoundDetail] = useState(null);
+  const [railOpen, setRailOpen] = useState(true);
+  const [messages, setMessages] = useState(CB.coachSeed);
+  const [busy, setBusy] = useState(false);
+  const [importing, setImporting] = useState(false);
+
+  const acc = ACCENTS[t.accent] || ACCENTS['#C7A24B'];
+  const vars = {
+    '--bg': '#E7DEC9', '--paper': '#F8F3E9', '--paper-dim': '#F1E9D8', '--panel': '#EFE7D5',
+    '--ink': '#0B3D2E', '--gold': acc.gold, '--gold-ink': acc.goldInk,
+    '--line': 'rgba(11,61,46,0.12)', '--line-strong': 'rgba(11,61,46,0.22)',
+    '--font-display': "'Playfair Display', Georgia, serif",
+  };
+
+  const goRoute = (r) => { setRoundDetail(null); setRoute(r); };
+  const openRound = (r) => { setRoute('rounds'); setRoundDetail(r); };
+  const openImport = () => setImporting(true);
+  const closeImport = () => { setImporting(false); if (mode === 'empty') { setMode('demo'); setRoute('rounds'); } };
+
+  const send = useCallback(async (text) => {
+    const next = [...messages, { role: 'user', text }];
+    setMessages(next);
+    setBusy(true);
+    try {
+      const api = next.slice(1).map((m) => ({ role: m.role === 'coach' ? 'assistant' : 'user', content: m.text }));
+      const reply = await window.claude.complete({ system: CB.coachSystem, max_tokens: 400, messages: api });
+      setMessages((m) => [...m, { role: 'coach', text: (reply || '').trim() || fallbackCoach(text) }]);
+    } catch (e) {
+      setMessages((m) => [...m, { role: 'coach', text: fallbackCoach(text) }]);
+    } finally { setBusy(false); }
+  }, [messages]);
+
+  if (!authed) {
+    return (
+      <div style={vars}>
+        <window.CBPasscode onEnter={(m) => { setMode(m); setAuthed(true); setRoute('dashboard'); }} />
+        <TweaksPanel><Tweaks t={t} setTweak={setTweak} /></TweaksPanel>
+      </div>
+    );
+  }
+
+  const chat = <window.CoachChat messages={messages} busy={busy} onSend={send} variant={route === 'coach' ? 'page' : 'rail'} />;
+
+  let content;
+  if (mode === 'empty' && route === 'dashboard') {
+    content = <window.EmptyState onImport={openImport} />;
+  } else if (route === 'dashboard') content = <window.Dashboard onRoute={goRoute} onOpenRound={openRound} onImport={openImport} />;
+  else if (route === 'rounds') content = roundDetail ? <window.RoundDetail round={roundDetail} onBack={() => setRoundDetail(null)} /> : <window.RoundsPage onOpenRound={openRound} onImport={openImport} />;
+  else if (route === 'insights') content = <window.InsightsPage />;
+  else if (route === 'courses') content = <window.CoursesPage />;
+  else if (route === 'bag') content = <window.BagPage />;
+  else if (route === 'profile') content = <window.ProfilePage onMode={(m) => { if (m === 'logout') { setAuthed(false); setMessages(CB.coachSeed); } else { setMode('empty'); setRoute('dashboard'); } }} />;
+  else if (route === 'coach') content = null;
+
+  const isCoachPage = route === 'coach';
+
+  return (
+    <div style={{ ...vars, height: '100vh', overflowX: 'auto', overflowY: 'hidden', background: 'var(--bg)' }} className="cb-scroll">
+    <div style={{ display: 'flex', height: '100vh', minWidth: 1280, background: 'var(--bg)', overflow: 'hidden' }}>
+      <window.CBSidebar route={route} onRoute={goRoute} />
+
+      {/* main */}
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
+        {/* top bar */}
+        <div style={{ height: 54, flexShrink: 0, borderBottom: '1px solid var(--line)', background: 'var(--bg)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 28px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontFamily: "'DM Mono', monospace", fontSize: 11, letterSpacing: '0.06em', color: 'rgba(34,49,36,0.55)' }}>
+            <span style={{ color: 'rgba(34,49,36,0.4)' }}>CADDIE BOOK</span>
+            <span style={{ color: 'rgba(34,49,36,0.3)' }}>/</span>
+            <span style={{ color: '#1B2A1D', fontWeight: 500 }}>{ROUTE_TITLE[route]}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            {mode === 'demo' && <window.DemoBadge />}
+            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: 'rgba(34,49,36,0.45)' }}>SUN · JUL 5</span>
+          </div>
+        </div>
+
+        {/* content */}
+        {isCoachPage ? (
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '26px 32px 8px' }}>
+              <window.CBPageHead eyebrow="ALWAYS ONE CLICK AWAY" title="Your Coach"
+                sub="Grounded in every round you've logged. Ask anything — it quotes your own numbers back." />
+            </div>
+            <div className="cb-scroll" style={{ flex: 1, minHeight: 0, padding: '0 32px 20px' }}>
+              <div key={'coach'} className="cb-view" style={{ height: '100%', maxWidth: 780, margin: '0 auto' }}>{chat}</div>
+            </div>
+          </div>
+        ) : (
+          <div className="cb-scroll" style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '26px 32px 40px' }}>
+            <div key={route + (roundDetail ? roundDetail.id : '')} className="cb-view" style={{ maxWidth: 1160, margin: '0 auto', height: route === 'courses' ? '100%' : 'auto' }}>
+              {content}
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* coach rail (hidden on full coach page) */}
+      {!isCoachPage && <window.CoachRail open={railOpen} onToggle={() => setRailOpen(!railOpen)} chat={chat} />}
+
+      <TweaksPanel><Tweaks t={t} setTweak={setTweak} /></TweaksPanel>
+    </div>
+    {importing && <window.ImportModal onClose={closeImport} />}
+    </div>
+  );
+}
+
+function Tweaks({ t, setTweak }) {
+  return (
+    <>
+      <TweakSection label="Accent" />
+      <TweakColor label="Crest & accent" value={t.accent}
+        options={['#C7A24B', '#2E8B62', '#B58A3C']}
+        onChange={(v) => setTweak('accent', v)} />
+      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 10.5, color: 'rgba(41,38,27,0.5)', lineHeight: 1.4, paddingTop: 2 }}>
+        Gold · Green · Brass — the flag, pins and highlights across the book.
+      </div>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+
+body {
+  min-height: 100vh;
+  background: #0A1A0E;
+  background-image: radial-gradient(130% 70% at 50% -5%, #1B4D3E 0%, #0A1A0E 65%);
+  font-family: "Inter", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: #fff;
+}
+
+/* Mobile: full-bleed app. Desktop: centered phone-width column (no fake bezel). */
+.cb-stage {
+  min-height: 100dvh;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 0;
+}
+
+/* The app shell. Full viewport on phones; a centered card on larger screens. */
+.cb-frame {
+  width: 100%;
+  height: 100dvh;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+@media (min-width: 601px) {
+  .cb-stage { padding: 24px 16px; align-items: center; }
+  .cb-frame {
+    width: 420px;
+    height: min(900px, calc(100dvh - 48px));
+    border-radius: 40px;
+    box-shadow: 0 40px 90px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.15);
+  }
+}
+
+/* Hidden scrollbars on the app scroll container */
+.sc-scroll::-webkit-scrollbar { width: 0; height: 0; }
+.sc-scroll { scrollbar-width: none; }
+
+/* Press / hover micro-interactions */
+.sc-tile, .sc-press {
+  transition: transform 0.12s cubic-bezier(.2,.8,.3,1), filter 0.15s ease, border-color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.sc-tile:active, .sc-press:active { transform: scale(0.975); filter: brightness(1.06); }
+.sc-tile:hover { border-color: rgba(240,192,64,0.4) !important; }
+
+@keyframes scShimmer { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
+@keyframes scEnter { from { opacity: 0.4; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes scPush { from { opacity: 0.5; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+.sc-view { animation: scEnter 0.32s cubic-bezier(.2,.8,.3,1) both; }
+.sc-overlay { animation: scPush 0.28s cubic-bezier(.2,.8,.3,1) both; }
+@media (prefers-reduced-motion: reduce) { .sc-view, .sc-overlay { animation: none; } }
+
+.sc-tabbtn {
+  background: transparent; border: none; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 6px 4px 0; flex: 1; -webkit-tap-highlight-color: transparent;
+}
+.sc-tablabel { font-family: "Inter", sans-serif; font-size: 9.5px; font-weight: 600; letter-spacing: 0.01em; }
