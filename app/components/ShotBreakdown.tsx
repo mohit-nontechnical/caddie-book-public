@@ -167,6 +167,7 @@ export const ShotBreakdown = ({ roundId }: { roundId: string }) => {
   const [data, setData] = useState<ShotsResponse | null>(null);
   const [error, setError] = useState(false);
   const [openHole, setOpenHole] = useState<number | null>(null);
+  const [selectedShot, setSelectedShot] = useState<{ hole: number; seq: number } | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -200,10 +201,20 @@ export const ShotBreakdown = ({ roundId }: { roundId: string }) => {
             const diff = h.strokes - h.par;
             const scoreColor = diff >= 2 ? "var(--bad)" : diff <= 0 ? "var(--good)" : "var(--cream-2)";
             const open = openHole === h.hole;
+            const activeSeq = selectedShot?.hole === h.hole ? selectedShot.seq : null;
+            const activeIndex = activeSeq == null ? -1 : h.shots.findIndex((s) => s.seq === activeSeq);
+            const chooseShot = (index: number) => {
+              const shot = h.shots[index];
+              if (shot) setSelectedShot({ hole: h.hole, seq: shot.seq });
+            };
             return (
               <div key={h.hole} style={{ padding: "10px 0 12px", borderTop: "1px solid var(--line)" }}>
                 <button
-                  onClick={() => setOpenHole(open ? null : h.hole)}
+                  aria-expanded={open}
+                  onClick={() => {
+                    setOpenHole(open ? null : h.hole);
+                    setSelectedShot(open ? null : { hole: h.hole, seq: h.shots[0]?.seq ?? 1 });
+                  }}
                   style={{ display: "flex", width: "100%", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8, background: "none", border: "none", padding: 0, cursor: h.gps ? "pointer" : "default", textAlign: "left" }}
                 >
                   <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.08em", color: "var(--cream-3)" }}>
@@ -226,15 +237,28 @@ export const ShotBreakdown = ({ roundId }: { roundId: string }) => {
                 </button>
                 {open && h.gps && (
                   <div style={{ marginBottom: 10 }}>
-                    <ShotHoleMap shots={h.shots} pin={h.pin} height={240} />
+                    <ShotHoleMap shots={h.shots} pin={h.pin} height={300} selectedSeq={activeSeq} />
+                    <div style={{ display: "grid", gridTemplateColumns: "72px 1fr 72px", gap: 7, marginTop: 8 }}>
+                      <button aria-label="Previous shot" disabled={activeIndex <= 0} onClick={() => chooseShot(activeIndex - 1)} style={{ ...shotNavStyle, opacity: activeIndex <= 0 ? 0.35 : 1 }}>← PREV</button>
+                      <div style={{ display: "grid", placeItems: "center", borderRadius: 10, background: hexA("#FFFFFF", 0.04), border: "1px solid var(--line)", fontFamily: "var(--font-mono)", fontSize: 9.5, color: "var(--cream-3)", letterSpacing: "0.08em" }}>
+                        SHOT {Math.max(1, activeIndex + 1)} OF {h.shots.length}
+                      </div>
+                      <button aria-label="Next shot" disabled={activeIndex < 0 || activeIndex >= h.shots.length - 1} onClick={() => chooseShot(activeIndex + 1)} style={{ ...shotNavStyle, opacity: activeIndex < 0 || activeIndex >= h.shots.length - 1 ? 0.35 : 1 }}>NEXT →</button>
+                    </div>
                   </div>
                 )}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {h.shots.map((s) => {
                     const t = sgTint(s.sg);
                     return (
-                      <span
+                      <button
                         key={s.seq}
+                        onClick={() => {
+                          if (h.gps) {
+                            setOpenHole(h.hole);
+                            setSelectedShot({ hole: h.hole, seq: s.seq });
+                          }
+                        }}
                         title={`Shot ${s.seq}: ${s.club} from ${s.lie}, ${fmtDist(s.dist, s.distUnit)}${s.rem == null ? ", holed" : ` → ${fmtDist(s.rem, s.remUnit)} left`} · SG ${fmtSg(s.sg)}`}
                         style={{
                           fontFamily: "var(--font-mono)",
@@ -242,14 +266,16 @@ export const ShotBreakdown = ({ roundId }: { roundId: string }) => {
                           padding: "5px 8px",
                           borderRadius: 8,
                           background: t.bg,
-                          border: "1px solid " + t.border,
+                          border: `1px solid ${activeSeq === s.seq ? "var(--gold)" : t.border}`,
                           color: t.color,
                           whiteSpace: "nowrap",
+                          cursor: h.gps ? "pointer" : "default",
+                          boxShadow: activeSeq === s.seq ? `0 0 0 2px ${hexA("#F0C040", 0.16)}` : "none",
                         }}
                       >
-                        {s.club} · {s.lie === "Green" ? fmtDist(s.dist, s.distUnit) : `${s.lie.toLowerCase()} ${fmtDist(s.dist, s.distUnit)}`}
+                        <b style={{ color: activeSeq === s.seq ? "var(--gold)" : "inherit" }}>{s.seq}</b> · {s.club} · {s.lie === "Green" ? fmtDist(s.dist, s.distUnit) : `${s.lie.toLowerCase()} ${fmtDist(s.dist, s.distUnit)}`}
                         {s.rem == null ? " ⛳" : ""}
-                      </span>
+                      </button>
                     );
                   })}
                 </div>
@@ -359,4 +385,16 @@ export const ShotBreakdown = ({ roundId }: { roundId: string }) => {
       )}
     </>
   );
+};
+
+const shotNavStyle: React.CSSProperties = {
+  border: "1px solid var(--line)",
+  borderRadius: 10,
+  padding: "9px 6px",
+  background: hexA("#FFFFFF", 0.05),
+  color: "var(--cream-2)",
+  fontFamily: "var(--font-mono)",
+  fontSize: 9,
+  letterSpacing: "0.06em",
+  cursor: "pointer",
 };

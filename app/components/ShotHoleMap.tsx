@@ -25,6 +25,7 @@ interface Props {
   shots: MapShot[];
   pin: [number, number] | null;
   height?: number;
+  selectedSeq?: number | null;
 }
 
 function segColor(sg: number): string {
@@ -35,9 +36,11 @@ function segColor(sg: number): string {
   return "#F4EFDF";
 }
 
-export const ShotHoleMap = ({ shots, pin, height = 260 }: Props) => {
+export const ShotHoleMap = ({ shots, pin, height = 260, selectedSeq = null }: Props) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Leaflet.Map | null>(null);
+  const allBoundsRef = useRef<Leaflet.LatLngBounds | null>(null);
+  const shotBoundsRef = useRef<Map<number, Leaflet.LatLngBounds>>(new Map());
 
   useEffect(() => {
     const el = containerRef.current;
@@ -52,7 +55,9 @@ export const ShotHoleMap = ({ shots, pin, height = 260 }: Props) => {
       const map = L.map(el, {
         zoomControl: false,
         attributionControl: true,
-        scrollWheelZoom: false,
+        scrollWheelZoom: true,
+        doubleClickZoom: true,
+        touchZoom: true,
         dragging: true,
       });
       mapRef.current = map;
@@ -68,6 +73,7 @@ export const ShotHoleMap = ({ shots, pin, height = 260 }: Props) => {
         const a = L.latLng(s.sLat!, s.sLng!);
         const b = L.latLng(s.eLat!, s.eLng!);
         bounds.push(a, b);
+        shotBoundsRef.current.set(s.seq, L.latLngBounds([a, b]).pad(0.7));
 
         L.polyline([a, b], {
           color: segColor(s.sg),
@@ -104,7 +110,12 @@ export const ShotHoleMap = ({ shots, pin, height = 260 }: Props) => {
         }).addTo(map);
       }
 
-      map.fitBounds(L.latLngBounds(bounds).pad(0.18));
+      allBoundsRef.current = L.latLngBounds(bounds).pad(0.18);
+      map.fitBounds(allBoundsRef.current);
+      if (selectedSeq != null) {
+        const selectedBounds = shotBoundsRef.current.get(selectedSeq);
+        if (selectedBounds) map.fitBounds(selectedBounds, { padding: [26, 26], maxZoom: 19 });
+      }
       setTimeout(() => map.invalidateSize(), 120);
     })();
 
@@ -114,15 +125,50 @@ export const ShotHoleMap = ({ shots, pin, height = 260 }: Props) => {
         mapRef.current.remove();
         mapRef.current = null;
       }
+      allBoundsRef.current = null;
+      shotBoundsRef.current.clear();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const target = selectedSeq == null ? allBoundsRef.current : shotBoundsRef.current.get(selectedSeq);
+    if (target) map.flyToBounds(target, { padding: [26, 26], duration: 0.55, maxZoom: 19 });
+  }, [selectedSeq]);
+
+  const zoom = (delta: number) => delta > 0 ? mapRef.current?.zoomIn(delta) : mapRef.current?.zoomOut(Math.abs(delta));
+  const fitHole = () => {
+    if (allBoundsRef.current) mapRef.current?.flyToBounds(allBoundsRef.current, { padding: [10, 10], duration: 0.5 });
+  };
+
   return (
-    <div
-      ref={containerRef}
-      data-noswipe
-      style={{ width: "100%", height, borderRadius: 12, overflow: "hidden", background: "#101510" }}
-    />
+    <div data-noswipe style={{ position: "relative", width: "100%", height, borderRadius: 14, overflow: "hidden", background: "#101510", border: "1px solid rgba(244,239,223,0.16)", boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.2)" }}>
+      <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
+      <div style={{ position: "absolute", zIndex: 500, top: 10, right: 10, display: "flex", flexDirection: "column", gap: 5 }}>
+        <button aria-label="Zoom in" onClick={() => zoom(1)} style={controlStyle}>+</button>
+        <button aria-label="Zoom out" onClick={() => zoom(-1)} style={controlStyle}>−</button>
+        <button aria-label="Fit entire hole" onClick={fitHole} style={{ ...controlStyle, fontSize: 9, letterSpacing: "0.05em" }}>FIT</button>
+      </div>
+      <div style={{ position: "absolute", zIndex: 500, left: 10, bottom: 10, padding: "5px 8px", borderRadius: 8, background: "rgba(10,25,14,0.78)", backdropFilter: "blur(8px)", color: "rgba(244,239,223,0.82)", font: "500 9px/1.2 'IBM Plex Mono', monospace", letterSpacing: "0.06em", pointerEvents: "none" }}>
+        PINCH · SCROLL · DRAG
+      </div>
+    </div>
   );
+};
+
+const controlStyle: React.CSSProperties = {
+  width: 34,
+  height: 34,
+  border: "1px solid rgba(244,239,223,0.24)",
+  borderRadius: 9,
+  background: "rgba(10,25,14,0.82)",
+  backdropFilter: "blur(8px)",
+  color: "#F4EFDF",
+  fontFamily: "'IBM Plex Mono', monospace",
+  fontSize: 19,
+  lineHeight: 1,
+  cursor: "pointer",
+  boxShadow: "0 4px 14px rgba(0,0,0,0.24)",
 };

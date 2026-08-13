@@ -479,10 +479,21 @@ function dSgChip(sg: number): { bg: string; border: string; color: string } {
 const dSg = (v: number) => `${v > 0 ? "+" : ""}${v.toFixed(2)}`;
 const dDist = (v: number, u: string | null) => `${v}${u === "ft" ? "ft" : "y"}`;
 const dFlagValue = (m: RedFlagMetricRow) => m.unit === "%" ? `${Math.round(m.value)}%` : m.unit === "SG" ? dSg(m.value) : m.value.toFixed(1);
+const desktopShotNav: React.CSSProperties = {
+  border: "1px solid rgba(34,49,36,0.12)",
+  borderRadius: 9,
+  padding: "8px 7px",
+  background: "rgba(34,49,36,0.04)",
+  color: "rgba(34,49,36,0.7)",
+  fontFamily: "'DM Mono',monospace",
+  fontSize: 9,
+  cursor: "pointer",
+};
 
 const ShotDetailSection: React.FC<{ roundId: string }> = ({ roundId }) => {
   const data = useJson<RoundShotsResponse>(`/api/round-shots?id=${encodeURIComponent(roundId)}`);
   const [openHole, setOpenHole] = useState<number | null>(null);
+  const [selectedShot, setSelectedShot] = useState<{ hole: number; seq: number } | null>(null);
   if (data.error || (data.data && !data.data.shots)) return null;
   const holes = data.data?.holes ?? [];
   const clubs = data.data?.clubs ?? [];
@@ -513,10 +524,20 @@ const ShotDetailSection: React.FC<{ roundId: string }> = ({ roundId }) => {
             const diff = h.strokes - h.par;
             const scoreColor = diff >= 2 ? "#B0433D" : diff <= 0 ? "#3E7A47" : "#223124";
             const open = openHole === h.hole;
+            const activeSeq = selectedShot?.hole === h.hole ? selectedShot.seq : null;
+            const activeIndex = activeSeq == null ? -1 : h.shots.findIndex((s) => s.seq === activeSeq);
+            const chooseShot = (index: number) => {
+              const shot = h.shots[index];
+              if (shot) setSelectedShot({ hole: h.hole, seq: shot.seq });
+            };
             return (
               <div key={h.hole} style={{ padding: "10px 0", borderTop: "1px solid rgba(34,49,36,0.1)" }}>
                 <button
-                  onClick={() => setOpenHole(open ? null : h.hole)}
+                  aria-expanded={open}
+                  onClick={() => {
+                    setOpenHole(open ? null : h.hole);
+                    setSelectedShot(open ? null : { hole: h.hole, seq: h.shots[0]?.seq ?? 1 });
+                  }}
                   style={{ display: "flex", width: "100%", justifyContent: "space-between", alignItems: "baseline", marginBottom: 7, background: "none", border: "none", padding: 0, cursor: h.gps ? "pointer" : "default", textAlign: "left" }}
                 >
                   <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, letterSpacing: "0.08em", color: "rgba(34,49,36,0.55)" }}>
@@ -538,15 +559,26 @@ const ShotDetailSection: React.FC<{ roundId: string }> = ({ roundId }) => {
                 </button>
                 {open && h.gps && (
                   <div style={{ marginBottom: 9 }}>
-                    <ShotHoleMap shots={h.shots} pin={h.pin} height={300} />
+                    <ShotHoleMap shots={h.shots} pin={h.pin} height={380} selectedSeq={activeSeq} />
+                    <div style={{ display: "grid", gridTemplateColumns: "86px 1fr 86px", gap: 8, marginTop: 8 }}>
+                      <button aria-label="Previous shot" disabled={activeIndex <= 0} onClick={() => chooseShot(activeIndex - 1)} style={{ ...desktopShotNav, opacity: activeIndex <= 0 ? 0.35 : 1 }}>← Previous</button>
+                      <div style={{ display: "grid", placeItems: "center", borderRadius: 9, background: "rgba(34,49,36,0.035)", border: "1px solid rgba(34,49,36,0.1)", fontFamily: "'DM Mono',monospace", fontSize: 9.5, color: "rgba(34,49,36,0.5)", letterSpacing: "0.08em" }}>SHOT {Math.max(1, activeIndex + 1)} OF {h.shots.length}</div>
+                      <button aria-label="Next shot" disabled={activeIndex < 0 || activeIndex >= h.shots.length - 1} onClick={() => chooseShot(activeIndex + 1)} style={{ ...desktopShotNav, opacity: activeIndex < 0 || activeIndex >= h.shots.length - 1 ? 0.35 : 1 }}>Next →</button>
+                    </div>
                   </div>
                 )}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {h.shots.map((s) => {
                     const t = dSgChip(s.sg);
                     return (
-                      <span
+                      <button
                         key={s.seq}
+                        onClick={() => {
+                          if (h.gps) {
+                            setOpenHole(h.hole);
+                            setSelectedShot({ hole: h.hole, seq: s.seq });
+                          }
+                        }}
                         title={`Shot ${s.seq}: ${s.club} from ${s.lie}, ${dDist(s.dist, s.distUnit)}${s.rem == null ? ", holed" : ` → ${dDist(s.rem, s.remUnit)} left`} · SG ${dSg(s.sg)}`}
                         style={{
                           fontFamily: "'DM Mono',monospace",
@@ -554,15 +586,16 @@ const ShotDetailSection: React.FC<{ roundId: string }> = ({ roundId }) => {
                           padding: "4px 8px",
                           borderRadius: 8,
                           background: t.bg,
-                          border: "1px solid " + t.border,
+                          border: `1px solid ${activeSeq === s.seq ? "#C7A24B" : t.border}`,
                           color: t.color,
                           whiteSpace: "nowrap",
-                          cursor: "default",
+                          cursor: h.gps ? "pointer" : "default",
+                          boxShadow: activeSeq === s.seq ? "0 0 0 2px rgba(199,162,75,0.16)" : "none",
                         }}
                       >
-                        {s.club} · {s.lie === "Green" ? dDist(s.dist, s.distUnit) : `${s.lie.toLowerCase()} ${dDist(s.dist, s.distUnit)}`}
+                        <b style={{ color: activeSeq === s.seq ? "#8A6B22" : "inherit" }}>{s.seq}</b> · {s.club} · {s.lie === "Green" ? dDist(s.dist, s.distUnit) : `${s.lie.toLowerCase()} ${dDist(s.dist, s.distUnit)}`}
                         {s.rem == null ? " ⛳" : ""}
-                      </span>
+                      </button>
                     );
                   })}
                 </div>
