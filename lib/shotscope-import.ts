@@ -6,7 +6,8 @@
 //   summary — "Course,Date,Tees,Holes,Score,..." (one row per round, incl. SG)
 //   holes   — "Hole,Par,SI,Score,FIR,GIR,Putts"
 //   shots   — "Hole,Par,Shot,Club,Lie,Distance,..."
-// Docs that match nothing (dispersion tabs, red-flag dashboards) are ignored.
+// Red-flag inputs live on the round-summary row; dashboard/dispersion tabs are
+// derived views and do not need to be persisted separately.
 //
 // Holes docs are matched to summary rows — and shots docs to holes docs — by
 // total score, which is robust without relying on filenames or tab names.
@@ -34,13 +35,14 @@ function parseCsv(content: string): string[][] {
     .map((l) => l.split(",").map((c) => c.trim()));
 }
 
-type DocKind = "summary" | "holes" | "shots" | "unknown";
+type DocKind = "summary" | "holes" | "shots" | "derived" | "unknown";
 
 function classify(rows: string[][]): DocKind {
   const header = rows[0]?.map((h) => h.toLowerCase()) ?? [];
   if (header[0] === "course" && header[1] === "date") return "summary";
   if (header[0] === "hole" && header[2] === "shot") return "shots";
   if (header[0] === "hole" && header.includes("score") && header.includes("putts")) return "holes";
+  if (header[0]?.includes("red flags dashboard") || header[0]?.includes("club dispersion")) return "derived";
   return "unknown";
 }
 
@@ -122,6 +124,14 @@ interface SummaryRow {
   sgShort?: number;
   sgPutting?: number;
   avgDriveYds?: number;
+  teeShotsInTrouble?: number;
+  multipleChipsInside50?: number;
+  threePutts?: number;
+  missedPuttsInside5?: number;
+  weakestArea?: string;
+  weakestAreaSg?: number;
+  weakestHole?: string;
+  weakestHoleSg?: number;
 }
 
 function parseSummaryRows(rows: string[][]): SummaryRow[] {
@@ -133,6 +143,15 @@ function parseSummaryRows(rows: string[][]): SummaryRow[] {
   const iApp = col("sg approach");
   const iShort = col("sg short");
   const iPutt = col("sg putt");
+  const iTrouble = col("tee shots in trouble");
+  const iMultiChips = col("multiple chips");
+  const iThreePutts = col("3-putts");
+  const iMissedShort = col("missed putts inside 5ft");
+  const iWeakArea = col("weakest area");
+  const iWeakAreaSg = header.findIndex((h, i) => i > iWeakArea && h.includes("weakest area sg"));
+  const iWeakHole = col("weakest hole");
+  const iWeakHoleSg = header.findIndex((h, i) => i > iWeakHole && h.includes("weakest hole sg"));
+  const optionalNumber = (r: string[], i: number) => i >= 0 && r[i] !== "" && r[i]?.toLowerCase() !== "n/a" ? Number(r[i]) : undefined;
   return rows
     .slice(1)
     .filter((r) => r[0]?.trim() && r[1]?.trim())
@@ -145,6 +164,14 @@ function parseSummaryRows(rows: string[][]): SummaryRow[] {
       sgShort: iShort >= 0 && r[iShort] !== "" ? Number(r[iShort]) : undefined,
       sgPutting: iPutt >= 0 && r[iPutt] !== "" ? Number(r[iPutt]) : undefined,
       avgDriveYds: iDrive >= 0 && r[iDrive] !== "" ? Number(r[iDrive]) : undefined,
+      teeShotsInTrouble: optionalNumber(r, iTrouble),
+      multipleChipsInside50: optionalNumber(r, iMultiChips),
+      threePutts: optionalNumber(r, iThreePutts),
+      missedPuttsInside5: optionalNumber(r, iMissedShort),
+      weakestArea: iWeakArea >= 0 ? r[iWeakArea] || undefined : undefined,
+      weakestAreaSg: optionalNumber(r, iWeakAreaSg),
+      weakestHole: iWeakHole >= 0 ? r[iWeakHole] || undefined : undefined,
+      weakestHoleSg: optionalNumber(r, iWeakHoleSg),
     }));
 }
 
@@ -187,6 +214,8 @@ export function buildRounds(
     } else if (kind === "shots") {
       const shots = parseShotRows(rows);
       if (shots.length) shotsDocs.push({ name: doc.name, shots });
+    } else if (kind === "derived") {
+      // These presentation tabs are recomputed per round by the app.
     } else if (doc.name) {
       warnings.push(`Skipped "${doc.name}" — not a round summary, holes, or shots table.`);
     }
@@ -220,6 +249,14 @@ export function buildRounds(
       stats.sgShort = summary.sgShort;
       stats.sgPutting = summary.sgPutting;
       stats.avgDriveYds = summary.avgDriveYds;
+      stats.teeShotsInTrouble = summary.teeShotsInTrouble;
+      stats.multipleChipsInside50 = summary.multipleChipsInside50;
+      stats.threePutts = summary.threePutts;
+      stats.missedPuttsInside5 = summary.missedPuttsInside5;
+      stats.weakestArea = summary.weakestArea;
+      stats.weakestAreaSg = summary.weakestAreaSg;
+      stats.weakestHole = summary.weakestHole;
+      stats.weakestHoleSg = summary.weakestHoleSg;
     }
 
     const shotIdx = shotsDocs.findIndex((sd, i) => !usedShots.has(i) && sd.shots.length === hd.total);

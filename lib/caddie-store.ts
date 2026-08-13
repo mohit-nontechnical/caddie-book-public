@@ -34,6 +34,14 @@ export interface RoundStats {
   sgShort?: number;
   sgPutting?: number;
   avgDriveYds?: number;
+  teeShotsInTrouble?: number;
+  multipleChipsInside50?: number;
+  threePutts?: number;
+  missedPuttsInside5?: number;
+  weakestArea?: string;
+  weakestAreaSg?: number;
+  weakestHole?: string;
+  weakestHoleSg?: number;
   shots?: import("./shotscope").Shot[]; // per-shot detail; strip before inlining in LLM prompts
   pins?: Record<number, [number, number]>; // hole → pin [lat, lng] (Shot Scope GPS)
 }

@@ -11,6 +11,7 @@ import {
   clubDispersion,
   clubLabel,
   groupShotsByHole,
+  roundRedFlags,
   type Shot,
 } from "@/lib/shotscope";
 
@@ -45,6 +46,7 @@ export async function GET(req: NextRequest) {
         gps: h.shots.some((s) => s.sLat != null),
       })),
       dispersion: clubDispersion(shots, round.stats?.pins).map((c) => ({ ...c, label: clubLabel(c.club) })),
+      redFlags: roundRedFlags(round, insights),
       clubs: insights.clubs.map((c) => ({ ...c, label: clubLabel(c.club) })),
       insights: {
         sgByCategory: insights.sgByCategory,

@@ -54,6 +54,27 @@ interface DispersionRow {
   biasYds: number | null;
   leftPct: number | null;
   rightPct: number | null;
+  offsetsYds: number[];
+}
+
+interface RedFlagMetric {
+  key: string;
+  label: string;
+  value: number;
+  target: number;
+  unit: "%" | "per 18" | "SG";
+  direction: "higher" | "lower";
+  status: "red" | "watch" | "good";
+}
+
+interface RedFlags {
+  metrics: RedFlagMetric[];
+  redCount: number;
+  watchCount: number;
+  weakestArea?: string;
+  weakestAreaSg?: number;
+  weakestHole?: string;
+  weakestHoleSg?: number;
 }
 
 interface ShotsResponse {
@@ -61,6 +82,7 @@ interface ShotsResponse {
   holes?: HoleRow[];
   clubs?: ClubRow[];
   dispersion?: DispersionRow[];
+  redFlags?: RedFlags;
   error?: string;
 }
 
@@ -97,6 +119,50 @@ function fmtSg(v: number): string {
   return `${v > 0 ? "+" : ""}${v.toFixed(2)}`;
 }
 
+function flagValue(m: RedFlagMetric): string {
+  if (m.unit === "%") return `${Math.round(m.value)}%`;
+  if (m.unit === "SG") return fmtSg(m.value);
+  return m.value.toFixed(1);
+}
+
+const RedFlagsCard = ({ data }: { data: RedFlags }) => {
+  const visible = data.metrics.filter((m) => m.status !== "good").slice(0, 6);
+  const statusColor = (status: RedFlagMetric["status"]) => status === "red" ? "#C05C5C" : status === "watch" ? "#D9A441" : "#4CAF82";
+  return (
+    <div style={{ padding: "0 16px", marginTop: 16 }}>
+      <div style={{ background: `linear-gradient(145deg, ${hexA("#C05C5C", 0.13)}, var(--panel) 48%)`, border: "1px solid " + hexA("#C05C5C", 0.28), borderRadius: 18, padding: "15px 14px 14px", overflow: "hidden" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 13 }}>
+          <div>
+            <div style={secTitle}>ROUND DIAGNOSTIC</div>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: 21, color: "var(--cream)", lineHeight: 1.05 }}>
+              {data.redCount ? `${data.redCount} red flag${data.redCount === 1 ? "" : "s"}` : "No major leaks"}
+            </div>
+          </div>
+          <div style={{ width: 46, height: 46, borderRadius: "50%", display: "grid", placeItems: "center", background: hexA(data.redCount ? "#C05C5C" : "#4CAF82", 0.16), border: "1px solid " + hexA(data.redCount ? "#C05C5C" : "#4CAF82", 0.35), fontFamily: "var(--font-display)", fontSize: 22, color: data.redCount ? "var(--bad)" : "var(--good)" }}>
+            {data.redCount}
+          </div>
+        </div>
+        {(data.weakestArea || data.weakestHole) && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+            {data.weakestArea && <div style={{ padding: "10px 11px", borderRadius: 12, background: hexA("#000000", 0.12) }}><div style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.12em", color: "var(--cream-3)", marginBottom: 4 }}>BIGGEST LEAK</div><div style={{ fontFamily: "var(--font-ui)", fontSize: 12.5, fontWeight: 600, color: "var(--cream)" }}>{data.weakestArea}</div><div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--bad)", marginTop: 2 }}>SG {data.weakestAreaSg == null ? "—" : fmtSg(data.weakestAreaSg)}</div></div>}
+            {data.weakestHole && <div style={{ padding: "10px 11px", borderRadius: 12, background: hexA("#000000", 0.12) }}><div style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.12em", color: "var(--cream-3)", marginBottom: 4 }}>COSTLIEST HOLE</div><div style={{ fontFamily: "var(--font-ui)", fontSize: 12.5, fontWeight: 600, color: "var(--cream)" }}>{data.weakestHole}</div><div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--bad)", marginTop: 2 }}>SG {data.weakestHoleSg == null ? "—" : fmtSg(data.weakestHoleSg)}</div></div>}
+          </div>
+        )}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 7 }}>
+          {visible.map((m) => {
+            const color = statusColor(m.status);
+            return <div key={m.key} style={{ padding: "9px 10px", borderRadius: 11, background: hexA(color, 0.08), border: "1px solid " + hexA(color, 0.2) }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 5, alignItems: "baseline" }}><span style={{ fontFamily: "var(--font-ui)", fontSize: 10.5, color: "var(--cream-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.label}</span><span style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700, color }}>{flagValue(m)}</span></div>
+              <div style={{ height: 3, background: hexA("#FFFFFF", 0.06), borderRadius: 2, marginTop: 7, position: "relative" }}><div style={{ position: "absolute", inset: 0, width: `${Math.min(100, 34 + Math.abs(m.value - m.target) / Math.max(Math.abs(m.target), 1) * 45)}%`, background: color, borderRadius: 2, opacity: 0.75 }} /></div>
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: 8.5, color: "var(--cream-3)", marginTop: 5 }}>TARGET {m.target}{m.unit === "%" ? "%" : m.unit === "SG" ? " SG" : " / 18"}</div>
+            </div>;
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const ShotBreakdown = ({ roundId }: { roundId: string }) => {
   const [data, setData] = useState<ShotsResponse | null>(null);
   const [error, setError] = useState(false);
@@ -125,6 +191,7 @@ export const ShotBreakdown = ({ roundId }: { roundId: string }) => {
 
   return (
     <>
+      {data.redFlags && <RedFlagsCard data={data.redFlags} />}
       {/* Shot-by-shot trace */}
       <div style={{ padding: "0 16px", marginTop: 16 }}>
         <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 18, padding: "14px 14px 6px" }}>
@@ -259,6 +326,17 @@ export const ShotBreakdown = ({ roundId }: { roundId: string }) => {
                     {seg(d.landed.rough, hexA("#C05C5C", 0.65), "rough")}
                     {seg(d.landed.other, hexA("#FFFFFF", 0.15), "other")}
                   </div>
+                  {d.avgOffsetYds != null && (
+                    <div style={{ position: "relative", height: 30, margin: "8px 2px 5px", borderRadius: 15, background: `linear-gradient(90deg, ${hexA("#C05C5C", 0.13)}, ${hexA("#4CAF82", 0.13)} 50%, ${hexA("#C05C5C", 0.13)})`, border: "1px solid " + hexA("#FFFFFF", 0.07), overflow: "hidden" }}>
+                      <div style={{ position: "absolute", left: "50%", top: 3, bottom: 3, width: 1, background: hexA("#F0C040", 0.65) }} />
+                      {(d.offsetsYds ?? []).map((offset, i) => {
+                        const span = Math.max(15, ...(d.offsetsYds ?? []).map((v) => Math.abs(v)));
+                        const left = 50 + (offset / span) * 43;
+                        return <span key={i} title={`${offset > 0 ? "+" : ""}${offset}y`} style={{ position: "absolute", left: `${left}%`, top: 7 + (i % 3) * 5, width: 6, height: 6, borderRadius: "50%", transform: "translateX(-50%)", background: offset < 0 ? "#D9A441" : "#C05C5C", border: "1px solid " + hexA("#FFFFFF", 0.45), boxShadow: `0 0 0 2px ${hexA("#000000", 0.12)}` }} />;
+                      })}
+                      <span style={{ position: "absolute", left: 6, bottom: 2, fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--cream-3)" }}>L</span><span style={{ position: "absolute", right: 6, bottom: 2, fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--cream-3)" }}>R</span>
+                    </div>
+                  )}
                   {d.avgOffsetYds != null && (
                     <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--cream-3)" }}>
                       miss {d.avgOffsetYds}y avg ·{" "}

@@ -222,6 +222,7 @@ export interface ClubDispersion {
   biasYds: number | null; // signed mean: negative = left, positive = right
   leftPct: number | null;
   rightPct: number | null;
+  offsetsYds: number[]; // signed lateral misses for a compact shot-pattern plot
 }
 
 const EARTH_YDS = 6371000 * 1.09361; // Earth radius in yards
@@ -298,9 +299,82 @@ export function clubDispersion(shots: Shot[], pins?: Record<number, [number, num
       biasYds: offsets.length ? round2(offsets.reduce((a, b) => a + b, 0) / offsets.length) : null,
       leftPct: offsets.length ? Math.round((offsets.filter((o) => o < 0).length / offsets.length) * 100) : null,
       rightPct: offsets.length ? Math.round((offsets.filter((o) => o > 0).length / offsets.length) * 100) : null,
+      offsetsYds: offsets.map(round2),
     });
   }
   return out.sort((a, b) => b.attempts - a.attempts);
+}
+
+export type FlagStatus = "red" | "watch" | "good";
+
+export interface RedFlagMetric {
+  key: string;
+  label: string;
+  value: number;
+  target: number;
+  unit: "%" | "per 18" | "SG";
+  direction: "higher" | "lower"; // which direction is better
+  status: FlagStatus;
+  severity: number;
+}
+
+export interface RoundRedFlags {
+  metrics: RedFlagMetric[];
+  redCount: number;
+  watchCount: number;
+  weakestArea?: string;
+  weakestAreaSg?: number;
+  weakestHole?: string;
+  weakestHoleSg?: number;
+}
+
+/** Per-round benchmark dashboard using the same ~20-HCP targets as the sheet. */
+export function roundRedFlags(round: Round, insights?: ShotInsights): RoundRedFlags {
+  const stats = round.stats ?? {};
+  const holes = Math.max(1, stats.holeCount ?? round.holes.length ?? 18);
+  const per18 = (value: number) => round2((value * 18) / holes);
+  const girPct = stats.girHoleCount ? round2(((stats.gir ?? 0) / stats.girHoleCount) * 100) : null;
+  const firPct = stats.fairwayHoleCount ? round2(((stats.fairwayHits ?? 0) / stats.fairwayHoleCount) * 100) : null;
+
+  const metric = (
+    key: string,
+    label: string,
+    value: number | null | undefined,
+    target: number,
+    unit: RedFlagMetric["unit"],
+    direction: RedFlagMetric["direction"]
+  ): RedFlagMetric | null => {
+    if (value == null || !Number.isFinite(value)) return null;
+    const miss = direction === "higher" ? target - value : value - target;
+    const scale = Math.max(Math.abs(target), unit === "SG" ? 2 : 1);
+    const severity = round2(Math.max(0, miss / scale));
+    const status: FlagStatus = miss <= 0 ? "good" : severity >= 0.5 ? "red" : "watch";
+    return { key, label, value: round2(value), target, unit, direction, status, severity };
+  };
+
+  const threePutts = stats.threePutts ?? insights?.threePuttHoles.length;
+  const values = [
+    metric("gir", "Greens in regulation", girPct, 30, "%", "higher"),
+    metric("fir", "Fairways in regulation", firPct, 50, "%", "higher"),
+    metric("putts", "Putts", stats.putts == null ? null : per18(stats.putts), 32, "per 18", "lower"),
+    metric("approach", "SG approaches", stats.sgApproach, 0, "SG", "higher"),
+    metric("short", "SG short game", stats.sgShort, 0, "SG", "higher"),
+    metric("putting", "SG putting", stats.sgPutting, 0, "SG", "higher"),
+    metric("trouble", "Tee shots in trouble", stats.teeShotsInTrouble == null ? null : per18(stats.teeShotsInTrouble), 3.3, "per 18", "lower"),
+    metric("chips", "Multiple chips inside 50y", stats.multipleChipsInside50 == null ? null : per18(stats.multipleChipsInside50), 2.1, "per 18", "lower"),
+    metric("three-putts", "3-putts or worse", threePutts == null ? null : per18(threePutts), 2.5, "per 18", "lower"),
+    metric("short-misses", "Missed putts inside 5ft", stats.missedPuttsInside5 == null ? null : per18(stats.missedPuttsInside5), 2.7, "per 18", "lower"),
+  ].filter((m): m is RedFlagMetric => m != null);
+
+  return {
+    metrics: values.sort((a, b) => b.severity - a.severity),
+    redCount: values.filter((m) => m.status === "red").length,
+    watchCount: values.filter((m) => m.status === "watch").length,
+    weakestArea: stats.weakestArea,
+    weakestAreaSg: stats.weakestAreaSg,
+    weakestHole: stats.weakestHole,
+    weakestHoleSg: stats.weakestHoleSg,
+  };
 }
 
 /** Rounds that carry shot-level data. */
