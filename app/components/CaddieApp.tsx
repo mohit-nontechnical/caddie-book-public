@@ -19,8 +19,38 @@ import { CoachChat } from "./CoachChat";
 import { useIsDesktop } from "./useIsDesktop";
 import { DesktopShell } from "./desktop/DesktopShell";
 import type { RoundSummary } from "./types";
+import { normalizeSlug, onPopView, pushView, type ViewSlug } from "./urlView";
 
 const TAB_ORDER = ["bag", "feed", "upload", "courses", "you"];
+
+// URL slug for each mobile tab (the "feed" tab is Insights, "you" is Profile).
+const TAB_SLUG: Record<string, ViewSlug> = {
+  bag: "bag",
+  feed: "insights",
+  upload: "upload",
+  courses: "courses",
+  you: "profile",
+};
+
+// Initial mobile state for a URL slug. Desktop-only slugs map to the nearest
+// mobile equivalent; /coach opens the chat overlay on top of Insights.
+function mobileStateFromSlug(slug: ViewSlug | ""): { tab: string; chat: boolean } {
+  switch (slug) {
+    case "insights":
+      return { tab: "feed", chat: false };
+    case "upload":
+      return { tab: "upload", chat: false };
+    case "courses":
+    case "rounds":
+      return { tab: "courses", chat: false };
+    case "profile":
+      return { tab: "you", chat: false };
+    case "coach":
+      return { tab: "feed", chat: true };
+    default:
+      return { tab: "bag", chat: false };
+  }
+}
 
 type StackEntry =
   | { kind: "slot"; data: Slot }
@@ -29,12 +59,13 @@ type StackEntry =
   | { kind: "course"; data: string }
   | { kind: "chat" };
 
-function App() {
+function App({ initialView = "" }: { initialView?: ViewSlug | "" }) {
   const [theme] = useState<"dark" | "light">("dark");
   const [layout] = useState("grid");
   const [heatmap] = useState("subtle");
-  const [tab, setTab] = useState("bag");
-  const [stack, setStack] = useState<StackEntry[]>([]);
+  const initial = mobileStateFromSlug(initialView);
+  const [tab, setTab] = useState(initial.tab);
+  const [stack, setStack] = useState<StackEntry[]>(initial.chat ? [{ kind: "chat" }] : []);
   const [doneDrills, setDoneDrills] = useState<Record<string, boolean>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const touchRef = useRef<{ x: number; y: number; t: number; ignored: boolean } | null>(null);
@@ -46,9 +77,30 @@ function App() {
   const pushDrill = (drill: Drill) => setStack((s) => [...s, { kind: "drill", data: drill }]);
   const pushRound = (r: RoundSummary) => setStack((s) => [...s, { kind: "round", data: r }]);
   const pushCourse = (c: string) => setStack((s) => [...s, { kind: "course", data: c }]);
-  const pushChat = () => setStack((s) => [...s, { kind: "chat" }]);
-  const back = () => setStack((s) => s.slice(0, -1));
-  const goTab = (tb: string) => { setStack([]); setTab(tb); };
+  const pushChat = () => {
+    setStack((s) => [...s, { kind: "chat" }]);
+    pushView("coach");
+  };
+  const back = () => {
+    if (top?.kind === "chat") pushView(TAB_SLUG[tab] ?? "bag");
+    setStack((s) => s.slice(0, -1));
+  };
+  const goTab = (tb: string) => {
+    setStack([]);
+    setTab(tb);
+    pushView(TAB_SLUG[tb] ?? "bag");
+  };
+
+  // Browser back/forward: restore the tab (and chat overlay) for the URL.
+  useEffect(
+    () =>
+      onPopView((slug) => {
+        const st = mobileStateFromSlug(slug);
+        setTab(st.tab);
+        setStack(st.chat ? [{ kind: "chat" }] : []);
+      }),
+    []
+  );
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
@@ -143,9 +195,10 @@ function App() {
   );
 }
 
-export default function CaddieApp() {
+export default function CaddieApp({ initialView = "" }: { initialView?: string }) {
   const [entered, setEntered] = useState(false);
   const { isDesktop, ready } = useIsDesktop();
+  const view = normalizeSlug(initialView);
 
   // Desktop (>=1024px): skip the mobile Cover/passcode entirely and render
   // the full desktop shell. `ready` guards against a flash of the mobile
@@ -154,10 +207,10 @@ export default function CaddieApp() {
   if (ready && isDesktop) {
     return (
       <GradesProvider>
-        <DesktopShell />
+        <DesktopShell initialView={view} />
       </GradesProvider>
     );
   }
 
-  return entered ? <App /> : <Cover onEnter={() => setEntered(true)} />;
+  return entered ? <App initialView={view} /> : <Cover onEnter={() => setEntered(true)} />;
 }

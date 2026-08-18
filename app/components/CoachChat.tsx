@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { hexA } from "@/lib/caddie-data";
 import { useCoachStyle } from "./useCoachStyle";
 import { CoachStylePicker } from "./CoachStylePicker";
+import { CoachMarkdown } from "./CoachMarkdown";
 
 interface Msg {
   role: "user" | "assistant";
@@ -92,13 +93,13 @@ export function CoachChat({ onBack }: { onBack: () => void }) {
                   fontFamily: "var(--font-ui)",
                   fontSize: 13.5,
                   lineHeight: 1.5,
-                  whiteSpace: "pre-wrap",
+                  whiteSpace: m.role === "user" ? "pre-wrap" : undefined,
                   ...(m.role === "user"
                     ? { background: "var(--gold)", color: "#0F2016", borderBottomRightRadius: 5, fontWeight: 500 }
                     : { background: "var(--panel)", border: "1px solid var(--line)", color: "var(--cream)", borderBottomLeftRadius: 5 }),
                 }}
               >
-                {m.role === "assistant" ? m.content.replace(/\*\*/g, "").replace(/^#+\s*/gm, "") : m.content}
+                {m.role === "assistant" ? <CoachMarkdown text={m.content} /> : m.content}
               </div>
             </div>
           ))}

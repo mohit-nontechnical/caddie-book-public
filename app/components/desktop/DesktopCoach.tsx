@@ -12,6 +12,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { IconCoach, IconFlag, IconPanel, IconSend } from "./DesktopIcons";
 import { CoachStylePicker } from "../CoachStylePicker";
 import { useCoachStyle } from "../useCoachStyle";
+import { CoachMarkdown } from "../CoachMarkdown";
 import type { CoachStyleId } from "@/lib/coach-styles";
 
 interface DisplayMessage {
@@ -187,10 +188,9 @@ const Bubble: React.FC<{ m: DisplayMessage; full: boolean; typing?: boolean }> =
             fontSize: full ? 14.5 : 13.5,
             color: "#22321f",
             lineHeight: 1.5,
-            whiteSpace: "pre-wrap",
           }}
         >
-          {typing ? <TypingDots /> : m.text}
+          {typing ? <TypingDots /> : <CoachMarkdown text={m.text} />}
         </div>
       </div>
     );

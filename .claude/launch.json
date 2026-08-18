@@ -1,9 +1,17 @@
 {
-  "servers": [
+  "version": "0.0.1",
+  "configurations": [
     {
-      "name": "caddie-book",
-      "command": "npx next dev -p 4765",
+      "name": "caddie-book-dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "dev", "-p", "4765"],
       "port": 4765
+    },
+    {
+      "name": "caddie-book-nopass",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["APP_PASSCODE=", "npx", "next", "dev", "-p", "4766"],
+      "port": 4766
     }
   ]
 }

@@ -15,8 +15,24 @@ import { DesktopCourses } from "./DesktopCourses";
 import { DesktopBag } from "./DesktopBag";
 import { DesktopProfile } from "./DesktopProfile";
 import { CBPageHead } from "./DesktopUI";
+import { onPopView, pushView, type ViewSlug } from "../urlView";
 
 export type DesktopRoute = "dashboard" | "rounds" | "insights" | "courses" | "bag" | "coach" | "profile";
+
+// Initial desktop route for a URL slug; mobile-only slugs fall back sensibly.
+function routeFromSlug(slug: ViewSlug | ""): DesktopRoute {
+  switch (slug) {
+    case "rounds":
+    case "insights":
+    case "courses":
+    case "bag":
+    case "coach":
+    case "profile":
+      return slug;
+    default:
+      return "dashboard"; // "", "dashboard", "upload" (mobile-only)
+  }
+}
 
 const ROUTE_TITLE: Record<DesktopRoute, string> = {
   dashboard: "Dashboard",
@@ -112,13 +128,19 @@ function useDesktopFonts() {
   }, []);
 }
 
-export function DesktopShell() {
+export function DesktopShell({ initialView = "" }: { initialView?: ViewSlug | "" }) {
   useDesktopFonts();
-  const [route, setRoute] = useState<DesktopRoute>("dashboard");
+  const [route, setRoute] = useState<DesktopRoute>(routeFromSlug(initialView));
   const [railOpen, setRailOpen] = useState(true);
   const { messages, busy, send, style, setStyle } = useDesktopCoach();
 
-  const goRoute = (r: DesktopRoute) => setRoute(r);
+  const goRoute = (r: DesktopRoute) => {
+    setRoute(r);
+    pushView(r);
+  };
+
+  // Browser back/forward: restore the route for the URL.
+  useEffect(() => onPopView((slug) => setRoute(routeFromSlug(slug))), []);
 
   const chat = (
     <DesktopCoachChat
