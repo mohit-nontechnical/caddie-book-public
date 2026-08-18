@@ -46,5 +46,9 @@ export async function middleware(req: NextRequest) {
 
   const loginUrl = req.nextUrl.clone();
   loginUrl.pathname = "/login";
+  // Preserve the deep link so login can return the user to the page they
+  // asked for (e.g. /insights). Root needs no marker.
+  loginUrl.search = "";
+  if (pathname !== "/") loginUrl.searchParams.set("from", pathname);
   return NextResponse.redirect(loginUrl);
 }

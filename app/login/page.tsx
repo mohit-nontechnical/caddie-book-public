@@ -20,7 +20,10 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (data.ok) {
-        window.location.href = "/";
+        // Return to the deep link that triggered the login redirect, if any.
+        // Only same-origin paths are honored (guards against open redirects).
+        const from = new URLSearchParams(window.location.search).get("from");
+        window.location.href = from && from.startsWith("/") && !from.startsWith("//") ? from : "/";
       } else {
         setError("Incorrect passcode");
       }
