@@ -5,6 +5,7 @@ import { IconChevron } from "./icons";
 import { useGrades } from "./GradesContext";
 import { HandicapPanel } from "./HandicapPanel";
 import { useLiveGolfer } from "./useLiveGolfer";
+import { useShareCard } from "./useShareCard";
 
 const SETTINGS: { label: string; detail: string }[] = [
   {
@@ -28,6 +29,7 @@ const SETTINGS: { label: string; detail: string }[] = [
 export const ProfileView = () => {
   const { gradeFor } = useGrades();
   const live = useLiveGolfer();
+  const card = useShareCard();
   const [openSetting, setOpenSetting] = useState<number | null>(null);
   const gpaMap: Record<string, number> = { A: 4, B: 3, C: 2, D: 1, F: 0 };
   const gpa = (slots.reduce((a, s) => a + gpaMap[gradeFor(s.id, s.grade)], 0) / slots.length).toFixed(2);
@@ -47,6 +49,18 @@ export const ProfileView = () => {
           <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--gold)", marginTop: 4, letterSpacing: "0.06em" }}>GOAL: {golfer.goal}</div>
         </div>
       </div>
+
+      <button
+        onClick={card.share}
+        disabled={card.busy}
+        className="sc-press"
+        style={{ width: "100%", marginBottom: 18, cursor: card.busy ? "default" : "pointer", background: "var(--gold)", color: "#0F2016", border: "none", borderRadius: 14, padding: "13px 16px", fontFamily: "var(--font-ui)", fontSize: 14, fontWeight: 700, opacity: card.busy ? 0.6 : 1 }}
+      >
+        {card.busy ? "Building your card…" : "Share my player card"}
+      </button>
+      {card.error && (
+        <div style={{ marginTop: -10, marginBottom: 18, fontFamily: "var(--font-ui)", fontSize: 12, color: "#C05C5C" }}>{card.error}</div>
+      )}
 
       <HandicapPanel />
 

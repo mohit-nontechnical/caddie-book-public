@@ -26,6 +26,7 @@ import { IconChevron, IconChevronD } from "./DesktopIcons";
 import { DesktopLineChart } from "./DesktopCharts";
 import { useGrades } from "../GradesContext";
 import { golfer, slots } from "@/lib/caddie-data";
+import { useShareCard } from "../useShareCard";
 import type { HandicapCourseRow, HandicapResponse, StatsResponse } from "./types";
 
 const INCLUDE9_KEY = "caddie:include9";
@@ -111,6 +112,7 @@ export const DesktopProfile: React.FC = () => {
 
   const handicap = useJson<HandicapResponse>(`/api/handicap?include9=${include9 ? 1 : 0}`);
   const stats = useJson<StatsResponse>("/api/stats");
+  const card = useShareCard();
 
   const anyLoading = handicap.loading || stats.loading;
 
@@ -171,13 +173,33 @@ export const DesktopProfile: React.FC = () => {
         >
           {golfer.initials}
         </span>
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 600, color: "#1B2A1D" }}>{golfer.name}</div>
           <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13.5, color: "rgba(34,49,36,0.6)", marginTop: 3 }}>
             {homeCourse ?? (anyLoading ? "…" : "No rounds yet")}
             {totalRounds > 0 ? ` · ${totalRounds} round${totalRounds === 1 ? "" : "s"} tracked` : ""}
           </div>
         </div>
+        <button
+          onClick={card.share}
+          disabled={card.busy}
+          title={card.error || "Download a shareable player-profile image"}
+          style={{
+            flexShrink: 0,
+            cursor: card.busy ? "default" : "pointer",
+            background: "var(--ink)",
+            color: "#F2ECDC",
+            border: "none",
+            borderRadius: 12,
+            padding: "11px 18px",
+            fontFamily: "'DM Sans',sans-serif",
+            fontSize: 13,
+            fontWeight: 600,
+            opacity: card.busy ? 0.6 : 1,
+          }}
+        >
+          {card.busy ? "Building…" : "Share my card"}
+        </button>
       </div>
 
       {/* hero stats */}
